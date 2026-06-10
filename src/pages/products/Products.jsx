@@ -1,218 +1,248 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import axios from "axios";
-import {
-  Plus,
-  Search,
-  Edit2,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertTriangle, Eye, PackageCheck, PackagePlus, Search, SlidersHorizontal, X } from "lucide-react";
+import { inr, products as seedProducts, vendorName, vendors } from "../../data/marketplaceData";
+import DataPager from "../../components/common/DataPager";
+import MetricCard from "../../components/common/MetricCard";
+
+const stockClass = (product) => {
+  if (product.status === "Suppressed") return "bg-red-50 text-red-700 ring-red-200";
+  if (product.stock < 15) return "bg-amber-50 text-amber-700 ring-amber-200";
+  return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+};
 
 export default function Products() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [catalog, setCatalog] = useState(seedProducts);
+  const [vendorId, setVendorId] = useState("all");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    vendorId: vendors[0]?.id || "",
+    name: "",
+    asin: "",
+    category: "",
+    price: "",
+    stock: "",
+  });
 
-  // 🔹 Fetch products
-  const fetchProducts = async () => {
-    try {
-      const res = await axios.get("https://velora-backend-production-3e79.up.railway.app/api/products");
-      setProducts(res.data);
-    } catch (error) {
-      console.error("Error fetching products", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  // 🔹 Delete product
-  const deleteProduct = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) return;
-
-    try {
-      await axios.delete(`https://velora-backend-production-3e79.up.railway.app/api/products/${id}`);
-      fetchProducts();
-    } catch (error) {
-      console.error("Delete failed", error);
-    }
-  };
-
-  // 🔹 Stock badge color
-  const getStockStatusStyle = (stock) => {
-    if (stock === 0) return "bg-red-100 text-red-700 border-red-200";
-    if (stock < 10) return "bg-yellow-100 text-yellow-700 border-yellow-200";
-    return "bg-green-100 text-green-700 border-green-200";
-  };
-
-  // 🔹 Search filter (SAFE)
-  const filteredProducts = products.filter(
-    (p) =>
-      p.name?.toLowerCase().includes(search.toLowerCase()) ||
-      p.category?.toLowerCase().includes(search.toLowerCase())
+  const visibleProducts = useMemo(
+    () =>
+      catalog.filter((product) => {
+        const matchesVendor = vendorId === "all" || product.vendorId === vendorId;
+        const matchesQuery = `${product.name} ${product.asin} ${product.category} ${vendorName(product.vendorId)}`
+          .toLowerCase()
+          .includes(query.toLowerCase());
+        return matchesVendor && matchesQuery;
+      }),
+    [catalog, query, vendorId]
   );
 
+  const pagedProducts = visibleProducts.slice((page - 1) * pageSize, page * pageSize);
+
+  const updatePageSize = (size) => {
+    setPageSize(size);
+    setPage(1);
+  };
+
+  const addListing = (event) => {
+    event.preventDefault();
+    if (!form.name.trim() || !form.vendorId) return;
+
+    const stock = Number(form.stock || 0);
+    setCatalog((current) => [
+      {
+        id: `PRD-${Date.now().toString().slice(-4)}`,
+        vendorId: form.vendorId,
+        name: form.name,
+        asin: form.asin || `B0NEW${Date.now().toString().slice(-4)}`,
+        category: form.category || "General",
+        price: Number(form.price || 0),
+        stock,
+        sold: 0,
+        status: stock === 0 ? "Suppressed" : stock < 15 ? "Low Stock" : "In Stock",
+        image: "https://images.unsplash.com/photo-1589917791524-05d1fbf684d8?auto=format&fit=crop&w=160&q=80",
+      },
+      ...current,
+    ]);
+    setShowForm(false);
+    setForm({
+      vendorId: vendors[0]?.id || "",
+      name: "",
+      asin: "",
+      category: "",
+      price: "",
+      stock: "",
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Products</h1>
-          <p className="text-sm text-gray-500">
-            Manage your product inventory and catalog
-          </p>
+    <div className="space-y-5">
+      <div className="rounded bg-white p-5 shadow-sm ring-1 ring-black/5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#c45500]">Inventory command center</p>
+            <h1 className="mt-1 text-2xl font-bold text-gray-900">Products and catalog</h1>
+            <p className="text-sm text-gray-600">Monitor vendor listings, stock health, ASIN status, and catalog ownership.</p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <select
+              value={vendorId}
+              onChange={(event) => {
+                setVendorId(event.target.value);
+                setPage(1);
+              }}
+              className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#ff9900] focus:ring-2 focus:ring-[#ff9900]/30"
+            >
+              <option value="all">All vendors</option>
+              {vendors.map((vendor) => (
+                <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
+              ))}
+            </select>
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <input
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search catalog"
+                className="w-full rounded border border-gray-300 py-2 pl-10 pr-3 text-sm outline-none focus:border-[#ff9900] focus:ring-2 focus:ring-[#ff9900]/30 sm:w-80"
+              />
+            </div>
+            <button
+              onClick={() => setShowForm(true)}
+              className="inline-flex items-center justify-center gap-2 rounded bg-[#ff9900] px-4 py-2 text-sm font-bold text-[#111827]"
+            >
+              <PackagePlus size={17} />
+              Add listing
+            </button>
+          </div>
         </div>
+      </div>
 
-        <Link to="/admin/products/add">
-          <button className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg hover:bg-indigo-700">
-            <Plus className="w-4 h-4" />
-            Add Product
+      <div className="grid gap-4 md:grid-cols-3">
+        <MetricCard label="Visible listings" value={visibleProducts.length} helper="catalog records in view" icon={Eye} tone="blue" />
+        <MetricCard label="Low stock" value={visibleProducts.filter((product) => product.stock < 15).length} helper="needs replenishment" icon={AlertTriangle} tone="orange" />
+        <MetricCard label="Suppressed" value={visibleProducts.filter((product) => product.status === "Suppressed").length} helper="requires catalog action" icon={PackageCheck} tone="red" />
+      </div>
+
+      <div className="overflow-hidden rounded bg-white shadow-sm ring-1 ring-black/5">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <h2 className="font-bold text-gray-900">Marketplace catalog</h2>
+          <button className="inline-flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm font-medium">
+            <SlidersHorizontal size={16} />
+            Filters
           </button>
-        </Link>
-      </div>
-
-      {/* Search */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border mb-6">
-        <div className="relative w-full sm:w-96">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by name or category..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
-          />
         </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-[#232f3e] text-white">
+              <tr>
+                <th className="px-5 py-3 font-semibold">Product</th>
+                <th className="px-5 py-3 font-semibold">Vendor</th>
+                <th className="px-5 py-3 font-semibold">Price</th>
+                <th className="px-5 py-3 font-semibold">Inventory</th>
+                <th className="px-5 py-3 font-semibold">Sales</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {pagedProducts.map((product) => (
+                <tr key={product.id} className="hover:bg-[#f7fafa]">
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <img src={product.image} alt={product.name} className="h-12 w-12 rounded object-cover ring-1 ring-gray-200" />
+                      <div>
+                        <p className="font-bold text-gray-900">{product.name}</p>
+                        <p className="text-xs text-gray-500">{product.asin} · {product.category}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 font-medium">{vendorName(product.vendorId)}</td>
+                  <td className="px-5 py-4 font-bold">{inr(product.price)}</td>
+                  <td className="px-5 py-4">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${stockClass(product)}`}>
+                      {product.stock < 15 && <AlertTriangle size={13} />}
+                      {product.status} · {product.stock}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4">{product.sold.toLocaleString("en-IN")} units</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <DataPager
+          total={visibleProducts.length}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={updatePageSize}
+        />
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        {loading ? (
-          <div className="p-10 text-center text-gray-500">
-            Loading products...
-          </div>
-        ) : filteredProducts.length === 0 ? (
-          <div className="p-10 text-center text-gray-500">
-            No products found
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500">
-                      Product
-                    </th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500">
-                      Category
-                    </th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500">
-                      Price
-                    </th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500">
-                      Stock
-                    </th>
-                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y">
-                  {filteredProducts.map((product) => (
-                    <tr
-                      key={product._id}
-                      className="hover:bg-gray-50 transition"
-                    >
-                      {/* Product + Image */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={product.image}
-                            alt={product.name}
-                            className="w-10 h-10 rounded object-cover border"
-                          />
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {product.name}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              #{product._id.slice(-6)}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {product.category}
-                      </td>
-
-                      <td className="px-6 py-4 font-medium">
-                        ₹{product.price}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <span
-                          className={`px-2.5 py-1 text-xs font-medium border rounded-full ${getStockStatusStyle(
-                            product.stock
-                          )}`}
-                        >
-                          {product.stock === 0
-                            ? "Out of Stock"
-                            : product.stock < 10
-                            ? "Low Stock"
-                            : "In Stock"}{" "}
-                          ({product.stock})
-                        </span>
-                      </td>
-
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Link
-                            to={`/admin/products/edit/${product._id}`}
-                          >
-                            <button className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg">
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                          </Link>
-
-                          <button
-                            onClick={() => deleteProduct(product._id)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl overflow-hidden rounded bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 bg-[#232f3e] px-5 py-4 text-white">
+              <div>
+                <h2 className="text-lg font-bold">Add marketplace listing</h2>
+                <p className="text-xs text-slate-300">Create a vendor-owned catalog item.</p>
+              </div>
+              <button onClick={() => setShowForm(false)} className="rounded p-2 hover:bg-white/10">
+                <X size={20} />
+              </button>
             </div>
 
-            {/* Footer */}
-            <div className="border-t px-6 py-4 flex justify-between">
-              <p className="text-sm text-gray-500">
-                Showing {filteredProducts.length} products
-              </p>
-              <div className="flex gap-2">
-                <button className="p-2 border rounded-lg">
-                  <ChevronLeft className="w-4 h-4" />
+            <form onSubmit={addListing} className="grid gap-4 p-5 md:grid-cols-2">
+              <label className="text-sm font-medium text-gray-700">
+                Vendor
+                <select
+                  value={form.vendorId}
+                  onChange={(event) => setForm({ ...form, vendorId: event.target.value })}
+                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#ff9900] focus:ring-2 focus:ring-[#ff9900]/30"
+                >
+                  {vendors.map((vendor) => (
+                    <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              {[
+                ["name", "Product name"],
+                ["asin", "ASIN / SKU"],
+                ["category", "Category"],
+                ["price", "Price"],
+                ["stock", "Opening stock"],
+              ].map(([key, label]) => (
+                <label key={key} className="text-sm font-medium text-gray-700">
+                  {label}
+                  <input
+                    value={form[key]}
+                    type={key === "price" || key === "stock" ? "number" : "text"}
+                    onChange={(event) => setForm({ ...form, [key]: event.target.value })}
+                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#ff9900] focus:ring-2 focus:ring-[#ff9900]/30"
+                  />
+                </label>
+              ))}
+
+              <div className="flex justify-end gap-3 border-t border-gray-100 pt-4 md:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="rounded border border-gray-300 px-4 py-2 text-sm font-medium"
+                >
+                  Cancel
                 </button>
-                <button className="p-2 border rounded-lg">
-                  <ChevronRight className="w-4 h-4" />
+                <button className="rounded bg-[#ff9900] px-4 py-2 text-sm font-bold text-[#111827]">
+                  Save listing
                 </button>
               </div>
-            </div>
-          </>
-        )}
-      </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

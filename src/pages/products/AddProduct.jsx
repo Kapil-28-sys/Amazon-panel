@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Package, Tag, DollarSign, Image as ImageIcon, Upload, CheckCircle } from "lucide-react";
+import { Package, 
+  Tag, DollarSign,
+   Image as ImageIcon,
+    Upload, CheckCircle }
+ from "lucide-react";
+import { apiUrl } from "../../config/api";
 
 function AddProduct() {
   const navigate = useNavigate();
@@ -22,7 +27,7 @@ function AddProduct() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await axios.get("https://velora-backend-production-3e79.up.railway.app/api/categories");
+        const res = await axios.get(apiUrl("/api/categories"));
         setCategories(res.data);
       } catch (err) {
         console.error("Failed to fetch categories");
@@ -52,7 +57,7 @@ function AddProduct() {
     formData.append("image", imageFile);
 
     try {
-      await axios.post("https://velora-backend-production-3e79.up.railway.app/api/products", formData);
+      await axios.post(apiUrl("/api/products"), formData);
       alert("Product added successfully");
       navigate("/admin/products");
     } catch (error) {
@@ -72,7 +77,7 @@ function AddProduct() {
         </div>
 
         <form onSubmit={handleSubmit} className="grid lg:grid-cols-3 gap-8">
-          
+
           {/* LEFT COLUMN: Main Details */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
@@ -196,9 +201,8 @@ function AddProduct() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`w-full flex items-center justify-center gap-2 text-white font-bold py-4 rounded-xl shadow-lg transition-all ${
-                    loading ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 shadow-blue-200 active:scale-[0.98]"
-                  }`}
+                  className={`w-full flex items-center justify-center gap-2 text-white font-bold py-4 rounded-xl shadow-lg transition-all ${loading ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 shadow-blue-200 active:scale-[0.98]"
+                    }`}
                 >
                   {!loading && <CheckCircle size={18} />}
                   {loading ? "Adding Product..." : "Publish Product"}
@@ -213,7 +217,7 @@ function AddProduct() {
               </div>
             </div>
           </div>
-          
+
         </form>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import axios from "axios";
+import { apiUrl } from "../config/api";
 
-const API = "http://localhost:5000/api/categories";
+const API = apiUrl("/api/categories");
 
 export const fetchCategories = () => axios.get(API);

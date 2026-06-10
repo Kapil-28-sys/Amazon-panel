@@ -1,132 +1,68 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import {
+  BarChart3,
+  Box,
+  Building2,
+  ClipboardList,
   LayoutDashboard,
   Package,
-  ShoppingCart,
-  Users,
-  Layers,
   Settings,
-  LogOut,
   Store,
+  Users,
 } from "lucide-react";
 
+const navItems = [
+  { name: "Performance", path: "/admin", icon: LayoutDashboard, end: true },
+  { name: "Vendors", path: "/admin/vendors", icon: Building2 },
+  { name: "Products", path: "/admin/products", icon: Package },
+  { name: "Orders", path: "/admin/orders", icon: ClipboardList },
+  { name: "Customers", path: "/admin/users", icon: Users },
+  { name: "Categories", path: "/admin/categories", icon: Box },
+  { name: "Settings", path: "/admin/settings", icon: Settings },
+];
+
 export default function Sidebar() {
-  const navigate = useNavigate();
-
-  // Logout handler
-  const handleLogout = () => {
-    localStorage.removeItem("adminToken"); // Clear stored token
-    navigate("/", { replace: true });  // Redirect to login page
-  };
-
-  // Active / inactive link styling
   const linkClass = ({ isActive }) =>
-    `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+    `flex items-center gap-3 rounded px-3 py-2.5 text-sm font-medium transition ${
       isActive
-        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20"
-        : "text-gray-400 hover:bg-gray-800 hover:text-white"
+        ? "bg-[#ff9900] text-[#111827]"
+        : "text-slate-200 hover:bg-[#37475a] hover:text-white"
     }`;
 
-  const navItems = [
-    {
-      name: "Dashboard",
-      path: "/admin",
-      icon: <LayoutDashboard size={20} />,
-      end: true,
-    },
-    {
-      name: "Products",
-      path: "/admin/products",
-      icon: <Package size={20} />,
-    },
-    {
-      name: "Orders",
-      path: "/admin/orders",
-      icon: <ShoppingCart size={20} />,
-    },
-    {
-      name: "Users",
-      path: "/admin/users",
-      icon: <Users size={20} />,
-    },
-    {
-      name: "Categories",
-      path: "/admin/categories",
-      icon: <Layers size={20} />,
-    },
-  ];
-
   return (
-    <aside className="w-72 bg-[#0f1115] text-white h-screen p-6 flex flex-col border-r border-gray-800 overflow-y-auto">
-      {/* Brand */}
-      <div className="flex items-center gap-3 px-2 mb-10">
-        <div className="bg-indigo-600 p-2 rounded-lg">
-          <Store size={24} className="text-white" />
+    <aside className="fixed inset-y-0 left-0 z-40 hidden h-screen w-72 shrink-0 flex-col overflow-hidden bg-[#131921] text-white md:flex">
+      <div className="border-b border-white/10 px-5 py-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded bg-[#ff9900] text-[#111827]">
+            <Store size={23} />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold leading-tight">Amazon Seller Hub</h1>
+            <p className="text-xs text-slate-400">Multi-vendor control panel</p>
+          </div>
         </div>
-        <h1 className="text-xl font-bold tracking-tight">
-          Velora <span className="text-indigo-500">Admin</span>
-        </h1>
       </div>
 
-      {/* Main Menu */}
-      <div className="flex-1">
-        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-4 mb-4">
-          Main Menu
-        </p>
+      <div className="border-b border-white/10 bg-[#232f3e] px-5 py-4">
+        <p className="text-xs uppercase tracking-wide text-slate-400">Signed in as</p>
+        <p className="mt-1 text-sm font-semibold">Super Admin</p>
+        <div className="mt-3 flex items-center gap-2 text-xs text-emerald-300">
+          <BarChart3 size={14} />
+          Marketplace health 91%
+        </div>
+      </div>
 
-        <nav className="space-y-1">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.end}
-              className={linkClass}
-            >
-              <span className="transition-transform duration-200 group-hover:scale-110">
-                {item.icon}
-              </span>
-              <span className="font-medium text-sm">{item.name}</span>
+      <nav className="flex-1 space-y-1 px-3 py-4">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink key={item.path} to={item.path} end={item.end} className={linkClass}>
+              <Icon size={18} />
+              {item.name}
             </NavLink>
-          ))}
-        </nav>
-
-        {/* Support */}
-        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-4 mt-10 mb-4">
-          Support
-        </p>
-
-        <nav className="space-y-1">
-          <NavLink to="/admin/settings" className={linkClass}>
-            <Settings size={20} />
-            <span className="font-medium text-sm">Settings</span>
-          </NavLink>
-        </nav>
-      </div>
-
-      {/* Footer / Admin Info & Logout */}
-      <div className="pt-6 border-t border-gray-800">
-        <div className="flex items-center gap-3 px-2 mb-6">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-sm">
-            AD
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold">Admin Name</span>
-            <span className="text-xs text-gray-500">Super Admin</span>
-          </div>
-        </div>
-
-        {/* Logout Button with onClick handler */}
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 w-full px-4 py-3 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all group"
-        >
-          <LogOut
-            size={20}
-            className="group-hover:translate-x-1 transition-transform"
-          />
-          <span className="font-medium text-sm">Logout</span>
-        </button>
-      </div>
+          );
+        })}
+      </nav>
     </aside>
   );
 }

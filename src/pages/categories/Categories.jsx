@@ -1,184 +1,245 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { 
-  FolderPlus, 
-  Trash2, 
-  Tag, 
-  Layers, 
-  Search,
-  Plus
-} from "lucide-react";
+import { Box, CheckCircle2, Image, Layers, PackageSearch, Plus, ShieldAlert, X } from "lucide-react";
+import { products } from "../../data/marketplaceData";
+import DataPager from "../../components/common/DataPager";
+import MetricCard from "../../components/common/MetricCard";
+
+const API_BASE_URL = "https://amazon-multi-vendor-3.onrender.com/api/categories";
+
+const readCategories = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.categories)) return payload.categories;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+};
+
+const categoryKey = (category) => category._id || category.id || category.name;
+
+const statusClass = (status) => {
+  if (status?.toLowerCase() === "active") return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+  return "bg-amber-50 text-amber-700 ring-amber-200";
+};
 
 export default function Categories() {
-
   const [categories, setCategories] = useState([]);
-  const [newCategory, setNewCategory] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    image: "",
+    status: "active",
+  });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  // 🔥 FETCH FROM DATABASE
+  const activeCategories = useMemo(
+    () => categories.filter((category) => category.status?.toLowerCase() === "active").length,
+    [categories]
+  );
+  const pagedCategories = categories.slice((page - 1) * pageSize, page * pageSize);
+
   const fetchCategories = async () => {
-    const res = await axios.get("https://velora-backend-production-3e79.up.railway.app/api/categories");
-    setCategories(res.data);
+    try {
+      setLoading(true);
+      setError("");
+      const response = await axios.get(API_BASE_URL);
+      setCategories(readCategories(response.data));
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to load categories.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchCategories();
   }, []);
 
-  // ➕ ADD CATEGORY (DB)
-  const addCategory = async () => {
-    if (!newCategory.trim()) return;
-
-    await axios.post("https://velora-backend-production-3e79.up.railway.app/api/categories", {
-      name: newCategory
-    });
-
-    setNewCategory("");
-    fetchCategories();
+  const updatePageSize = (size) => {
+    setPageSize(size);
+    setPage(1);
   };
 
-  // 🗑 DELETE CATEGORY (DB)
- const deleteCategory = async (id) => {
-  const confirmDelete = window.confirm(
-    "Are you sure you want to delete this category?"
-  );
+  const createCategory = async (event) => {
+    event.preventDefault();
+    if (!form.name.trim()) return;
 
-  if (!confirmDelete) return;
-
-  await axios.delete(`https://velora-backend-production-3e79.up.railway.app/api/categories/${id}`);
-  fetchCategories();
-};
-
+    try {
+      setSaving(true);
+      setError("");
+      await axios.post(`${API_BASE_URL}/add`, {
+        name: form.name.trim(),
+        image: form.image.trim(),
+        status: form.status,
+      });
+      setForm({ name: "", image: "", status: "active" });
+      setShowForm(false);
+      setPage(1);
+      await fetchCategories();
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to add category.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-8 font-sans">
-
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">Categories</h1>
-        <p className="text-sm text-gray-500">
-          Organize your products into logical groups.
-        </p>
+    <div className="space-y-5">
+      <div className="rounded bg-white p-5 shadow-sm ring-1 ring-black/5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#c45500]">Catalog governance</p>
+            <h1 className="mt-1 text-2xl font-bold text-gray-900">Categories</h1>
+            <p className="text-sm text-gray-600">Create marketplace categories and review live catalog groups.</p>
+          </div>
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center justify-center gap-2 rounded bg-[#ff9900] px-4 py-2 text-sm font-bold text-[#111827] hover:bg-[#f3a847]"
+          >
+            <Plus size={17} />
+            Add category
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid gap-4 md:grid-cols-3">
+        <MetricCard label="Categories" value={categories.length} helper="catalog groups" icon={Layers} tone="purple" />
+        <MetricCard label="Listings mapped" value={products.length} helper="products assigned" icon={PackageSearch} tone="blue" />
+        <MetricCard label="Active" value={activeCategories} helper="available categories" icon={CheckCircle2} tone="green" />
+      </div>
 
-        {/* Left Column */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sticky top-24">
+      <div className="overflow-hidden rounded bg-white shadow-sm ring-1 ring-black/5">
+        <div className="flex flex-col gap-2 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Layers size={19} className="text-[#c45500]" />
+            <h2 className="font-bold">Category map</h2>
+          </div>
+          {loading && <span className="text-sm text-gray-500">Loading categories...</span>}
+          {error && <span className="text-sm font-medium text-red-600">{error}</span>}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-[#232f3e] text-white">
+              <tr>
+                <th className="px-5 py-3 font-semibold">Category</th>
+                <th className="px-5 py-3 font-semibold">Image</th>
+                <th className="px-5 py-3 font-semibold">Listings</th>
+                <th className="px-5 py-3 font-semibold">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {pagedCategories.map((category) => (
+                <tr key={categoryKey(category)} className="hover:bg-[#f7fafa]">
+                  <td className="px-5 py-4">
+                    <span className="inline-flex items-center gap-2 font-bold text-gray-900">
+                      <Box size={17} className="text-[#c45500]" />
+                      {category.name}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className="inline-flex items-center gap-2 text-gray-600">
+                      <Image size={16} className="text-gray-400" />
+                      {category.image || "No image"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4">{products.filter((product) => product.category === category.name).length}</td>
+                  <td className="px-5 py-4">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold capitalize ring-1 ${statusClass(category.status)}`}>
+                      {category.status?.toLowerCase() === "active" ? <CheckCircle2 size={14} /> : <ShieldAlert size={14} />}
+                      {category.status || "inactive"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {!loading && categories.length === 0 && (
+                <tr>
+                  <td className="px-5 py-8 text-center text-gray-500" colSpan={4}>
+                    No categories found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <DataPager
+          total={categories.length}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={updatePageSize}
+        />
+      </div>
 
-            <div className="flex items-center gap-2 mb-4 text-indigo-600">
-              <FolderPlus className="w-5 h-5" />
-              <h2 className="font-semibold text-gray-800">Create New</h2>
-            </div>
-
-            <div className="space-y-4">
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl overflow-hidden rounded bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 bg-[#232f3e] px-5 py-4 text-white">
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">
-                  Category Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Winter Wear"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addCategory()}
-                />
+                <h2 className="text-lg font-bold">Add category</h2>
+                <p className="text-xs text-slate-300">Create a category in the live catalog.</p>
               </div>
-
-              <button
-                onClick={addCategory}
-                className="w-full bg-indigo-600 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Add Category
+              <button onClick={() => setShowForm(false)} className="rounded p-2 hover:bg-white/10">
+                <X size={20} />
               </button>
             </div>
 
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <p className="text-xs text-blue-700 leading-relaxed">
-                <strong>Tip:</strong> Keep names short and descriptive for better navigation.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-
-            <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-              <div className="flex items-center gap-2 text-gray-600">
-                <Layers className="w-4 h-4" />
-                <span className="text-sm font-medium">
-                  All Categories ({categories.length})
-                </span>
-              </div>
-
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-2 text-gray-400" />
+            <form onSubmit={createCategory} className="grid gap-4 p-5">
+              <label className="text-sm font-medium text-gray-700">
+                Category name
                 <input
-                  type="text"
-                  placeholder="Filter list..."
-                  className="pl-9 pr-3 py-1.5 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 w-40 sm:w-64"
+                  value={form.name}
+                  onChange={(event) => setForm({ ...form, name: event.target.value })}
+                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#ff9900] focus:ring-2 focus:ring-[#ff9900]/30"
+                  placeholder="Electronics"
+                  required
                 />
+              </label>
+
+              <label className="text-sm font-medium text-gray-700">
+                Image
+                <input
+                  value={form.image}
+                  onChange={(event) => setForm({ ...form, image: event.target.value })}
+                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#ff9900] focus:ring-2 focus:ring-[#ff9900]/30"
+                  placeholder="electronics.jpg"
+                />
+              </label>
+
+              <label className="text-sm font-medium text-gray-700">
+                Status
+                <select
+                  value={form.status}
+                  onChange={(event) => setForm({ ...form, status: event.target.value })}
+                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#ff9900] focus:ring-2 focus:ring-[#ff9900]/30"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </label>
+
+              <div className="flex justify-end gap-3 border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="rounded border border-gray-300 px-4 py-2 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={saving}
+                  className="inline-flex items-center gap-2 rounded bg-[#ff9900] px-4 py-2 text-sm font-bold text-[#111827] hover:bg-[#f3a847] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Plus size={17} />
+                  {saving ? "Saving..." : "Save category"}
+                </button>
               </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    <th className="px-6 py-4">#</th>
-                    <th className="px-6 py-4">Category Details</th>
-                    <th className="px-6 py-4 text-right">Action</th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-gray-100">
-                  {categories.map((cat, index) => (
-                    <tr key={cat._id} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-6 py-4 text-sm text-gray-400 font-mono">
-                        {String(index + 1).padStart(2, "0")}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-gray-100 rounded-md group-hover:bg-indigo-100 transition-colors">
-                            <Tag className="w-4 h-4 text-gray-500 group-hover:text-indigo-600" />
-                          </div>
-                          <span className="font-medium text-gray-700">
-                            {cat.name}
-                          </span>
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => deleteCategory(cat._id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {categories.length === 0 && (
-              <div className="p-12 text-center">
-                <Layers className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-                <p className="text-gray-500 italic">
-                  No categories created yet.
-                </p>
-              </div>
-            )}
+            </form>
           </div>
         </div>
-
-      </div>
+      )}
     </div>
   );
 }

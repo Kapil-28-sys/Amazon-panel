@@ -1,122 +1,146 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import {
-  Bell,
-  Search,
-  LogOut,
-  User,
-  Settings,
-  ChevronRight,
-  Home,
-} from "lucide-react";
+import { Bell, ChevronDown, LogIn, LogOut, Menu, Search, ShieldCheck, X } from "lucide-react";
+import { vendors } from "../../data/marketplaceData";
 
 export default function Navbar() {
-  const navigate = useNavigate();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [session, setSession] = useState({
+    loggedIn: true,
+    role: "Superadmin",
+    name: "Super Admin",
+  });
+  const [showLogin, setShowLogin] = useState(false);
+  const [loginRole, setLoginRole] = useState("Superadmin");
 
-  const handleLogout = () => {
-    if (isLoggingOut) return; // prevent double click
+  const login = (event) => {
+    event.preventDefault();
+    setSession({
+      loggedIn: true,
+      role: loginRole,
+      name: loginRole === "Vendor" ? "Vendor Admin" : "Super Admin",
+    });
+    setShowLogin(false);
+  };
 
-    // Trigger animation
-    setIsLoggingOut(true);
-
-    // Wait for animation to complete (300ms), then logout
-    setTimeout(() => {
-      localStorage.removeItem("adminToken");
-      navigate("/", { replace: true });
-    }, 300);
+  const logout = () => {
+    setSession({
+      loggedIn: false,
+      role: "Guest",
+      name: "Not signed in",
+    });
   };
 
   return (
-    <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-8 sticky top-0 z-20 relative">
-      {/* Left: Breadcrumbs & Page Title */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 text-gray-400">
-          <Home size={16} />
-          <ChevronRight size={14} />
-        </div>
-        <h2 className="text-sm font-semibold text-gray-800 tracking-tight">
-          Admin Dashboard
-        </h2>
-      </div>
-
-      {/* Center: Global Search */}
-      <div className="hidden md:flex relative w-96">
-        <Search
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          size={18}
-        />
-        <input
-          type="text"
-          placeholder="Search for orders, users or products..."
-          className="w-full bg-gray-50 border-none rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
-        />
-      </div>
-
-      {/* Right: Actions & Profile */}
-      <div className="flex items-center gap-2">
-        {/* Notifications */}
-        <button className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg relative transition-colors">
-          <Bell size={20} />
-          <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+    <header className="sticky top-0 z-30 border-b border-[#131921] bg-[#131921] text-white">
+      <div className="flex h-16 items-center gap-4 px-4 md:px-6">
+        <button className="rounded p-2 hover:bg-white/10 md:hidden">
+          <Menu size={22} />
         </button>
 
-        {/* Settings */}
-        <Link to="/admin/settings">
-          <button className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors">
-            <Settings size={20} />
-          </button>
-        </Link>
+        <div className="min-w-fit">
+          <p className="text-xs text-slate-300">Marketplace</p>
+          <p className="text-sm font-bold">Amazon-style Admin</p>
+        </div>
 
-        <div className="h-6 w-[1px] bg-gray-200 mx-2"></div>
-
-        {/* User Profile & Logout Button with Animation */}
-        <div className="flex items-center gap-3 pl-2 group cursor-pointer relative">
-          <div className="text-right hidden sm:block">
-            <p className="text-xs font-bold text-gray-900">Velora Admin</p>
-            <p className="text-[10px] text-gray-500 font-medium uppercase tracking-tighter">
-              Superuser
-            </p>
-          </div>
-
-          <button
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="flex items-center gap-2 cursor-pointer bg-gray-900 text-white p-1 pr-3 rounded-full hover:bg-gray-800 transition-all relative overflow-hidden"
-          >
-            <div className="w-7 h-7 bg-indigo-500 rounded-full flex items-center justify-center text-[10px] font-bold relative z-10">
-              VA
-            </div>
-            <LogOut size={14} className="text-gray-400 relative z-10" />
-
-            {/* Ripple animation element */}
-            {isLoggingOut && (
-              <span className="absolute inset-0 flex items-center justify-center">
-                <span className="absolute w-0 h-0 bg-white/30 rounded-full animate-logout-ripple"></span>
-              </span>
-            )}
+        <div className="flex min-w-0 flex-1 overflow-hidden rounded border-2 border-[#ff9900] bg-white">
+          <select className="hidden bg-[#f3f3f3] px-3 text-sm text-gray-800 outline-none sm:block">
+            <option>All vendors</option>
+            {vendors.map((vendor) => (
+              <option key={vendor.id}>{vendor.name}</option>
+            ))}
+          </select>
+          <input
+            className="min-w-0 flex-1 px-4 py-2 text-sm text-gray-900 outline-none"
+            placeholder="Search products, orders, vendors, customers"
+          />
+          <button className="flex w-12 items-center justify-center bg-[#ff9900] text-[#111827]">
+            <Search size={20} />
           </button>
         </div>
+
+        <div className="hidden items-center gap-2 rounded border border-white/15 px-3 py-2 text-sm lg:flex">
+          <ShieldCheck size={17} className="text-[#ff9900]" />
+          <span>{session.role}</span>
+          <ChevronDown size={14} />
+        </div>
+
+        {session.loggedIn ? (
+          <button
+            onClick={logout}
+            className="hidden items-center gap-2 rounded border border-white/15 px-3 py-2 text-sm font-medium hover:bg-white/10 sm:inline-flex"
+          >
+            <LogOut size={16} />
+            Logout
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowLogin(true)}
+            className="hidden items-center gap-2 rounded bg-[#ff9900] px-3 py-2 text-sm font-bold text-[#111827] hover:bg-[#f3a847] sm:inline-flex"
+          >
+            <LogIn size={16} />
+            Login
+          </button>
+        )}
+
+        <button className="relative rounded p-2 hover:bg-white/10">
+          <Bell size={20} />
+          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#ff9900]" />
+        </button>
       </div>
 
-      {/* Add custom keyframe animation */}
-      <style>{`
-        @keyframes logoutRipple {
-          0% {
-            width: 0;
-            height: 0;
-            opacity: 0.6;
-          }
-          100% {
-            width: 200px;
-            height: 200px;
-            opacity: 0;
-          }
-        }
-        .animate-logout-ripple {
-          animation: logoutRipple 0.3s ease-out forwards;
-        }
-      `}</style>
+      {showLogin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 text-gray-900 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded bg-white shadow-2xl">
+            <div className="flex items-center justify-between bg-[#232f3e] px-5 py-4 text-white">
+              <div>
+                <h2 className="text-lg font-bold">Sign in</h2>
+                <p className="text-xs text-slate-300">Choose admin or vendor panel access.</p>
+              </div>
+              <button onClick={() => setShowLogin(false)} className="rounded p-2 hover:bg-white/10">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={login} className="space-y-4 p-5">
+              <div className="grid grid-cols-2 gap-2 rounded bg-gray-100 p-1">
+                {["Superadmin", "Vendor"].map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => setLoginRole(role)}
+                    className={`rounded px-3 py-2 text-sm font-bold ${
+                      loginRole === role ? "bg-[#ff9900] text-[#111827]" : "text-gray-600"
+                    }`}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+
+              <label className="block text-sm font-medium text-gray-700">
+                Email
+                <input
+                  type="email"
+                  placeholder={loginRole === "Vendor" ? "vendor@example.com" : "admin@example.com"}
+                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#ff9900] focus:ring-2 focus:ring-[#ff9900]/30"
+                />
+              </label>
+
+              <label className="block text-sm font-medium text-gray-700">
+                Password
+                <input
+                  type="password"
+                  placeholder="Password"
+                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#ff9900] focus:ring-2 focus:ring-[#ff9900]/30"
+                />
+              </label>
+
+              <button className="w-full rounded bg-[#ff9900] px-4 py-2.5 text-sm font-bold text-[#111827] hover:bg-[#f3a847]">
+                Login as {loginRole}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

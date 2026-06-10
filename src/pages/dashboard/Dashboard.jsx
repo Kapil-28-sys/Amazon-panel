@@ -1,161 +1,167 @@
-import React, { useEffect, useState } from 'react';
-import axios from "axios";
-import { Link } from 'react-router-dom';
-import { Package, ShoppingCart, Users, TrendingUp, Loader2 } from 'lucide-react';
+import { useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  BarChart3,
+  Box,
+  Building2,
+  CircleDollarSign,
+  ClipboardList,
+  Star,
+  TrendingUp,
+} from "lucide-react";
+import {
+  inr,
+  orders,
+  performance,
+  products,
+  summaryFor,
+  vendorName,
+  vendors,
+} from "../../data/marketplaceData";
+import MetricCard from "../../components/common/MetricCard";
 
 export default function Dashboard() {
-  const [stats, setStats] = useState([]);
-  const [recentOrders, setRecentOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [vendorId, setVendorId] = useState("all");
+  const summary = summaryFor(vendorId);
+  const scopedPerformance = useMemo(
+    () => (vendorId === "all" ? performance : performance.filter((item) => item.vendorId === vendorId)),
+    [vendorId]
+  );
+  const scopedOrders = vendorId === "all" ? orders : orders.filter((order) => order.vendorId === vendorId);
+  const scopedProducts = vendorId === "all" ? products : products.filter((product) => product.vendorId === vendorId);
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const res = await axios.get("https://velora-backend-production-3e79.up.railway.app/api/dashboard");
-        const data = res.data;
-
-        setStats([
-          {
-            label: "Total Products",
-            value: data.totalProducts || 0,
-            icon: <Package className="w-6 h-6 text-blue-600" />,
-            bg: "bg-blue-100",
-          },
-          {
-            label: "Total Orders",
-            value: data.totalOrders || 0,
-            icon: <ShoppingCart className="w-6 h-6 text-purple-600" />,
-            bg: "bg-purple-100",
-          },
-          {
-            label: "Total Users",
-            value: data.totalUsers || 0,
-            icon: <Users className="w-6 h-6 text-yellow-600" />,
-            bg: "bg-yellow-100",
-          },
-          {
-            label: "Total Revenue",
-            value: "₹" + (data.totalRevenue || 0).toLocaleString('en-IN'),
-            icon: <TrendingUp className="w-6 h-6 text-green-600" />,
-            bg: "bg-green-100",
-          },
-        ]);
-
-        setRecentOrders(data.recentOrders || []);
-      } catch (err) {
-        console.error("Error fetching dashboard data:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboard();
-  }, []);
-
-  const getStatusStyle = (status) => {
-    switch (status) {
-      case 'Delivered': return 'bg-green-100 text-green-700 border-green-200';
-      case 'Pending': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'Cancelled': return 'bg-red-100 text-red-700 border-red-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
+  const metrics = [
+    { label: "Revenue", value: inr(summary.revenue), icon: CircleDollarSign, tone: "green", helper: "settled marketplace revenue" },
+    { label: "Orders", value: summary.orders.toLocaleString("en-IN"), icon: ClipboardList, tone: "blue", helper: "last 30 days" },
+    { label: "Products", value: summary.products, icon: Box, tone: "purple", helper: `${summary.lowStock} need stock action` },
+    { label: "Vendors", value: vendorId === "all" ? vendors.length : 1, icon: Building2, tone: "orange", helper: "active seller panels" },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 lg:p-8 font-sans text-gray-900">
-      
-      {/* HEADER */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard Overview</h1>
-        <p className="text-gray-500 text-sm mt-1">Welcome back, here is what's happening today.</p>
-      </div>
+    <div className="space-y-5">
+      <section className="rounded bg-[#232f3e] p-5 text-white shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#ff9900]">
+              {vendorId === "all" ? "Superadmin performance center" : "Vendor performance panel"}
+            </p>
+            <h1 className="mt-1 text-2xl font-bold">
+              {vendorId === "all" ? "Marketplace command dashboard" : vendorName(vendorId)}
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-slate-300">
+              Track vendor revenue, catalog quality, order health, returns, and growth in one Amazon-style operations view.
+            </p>
+          </div>
 
-      {/* STATS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((item, index) => (
-          <div 
-            key={index} 
-            className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-4 transition-all hover:shadow-md"
+          <select
+            value={vendorId}
+            onChange={(event) => setVendorId(event.target.value)}
+            className="w-full rounded border border-white/20 bg-white px-3 py-2 text-sm font-medium text-gray-900 outline-none lg:w-72"
           >
-            <div className={`p-4 rounded-full flex-shrink-0 ${item.bg}`}>
-              {item.icon}
+            <option value="all">Superadmin: All vendors</option>
+            {vendors.map((vendor) => (
+              <option key={vendor.id} value={vendor.id}>
+                Vendor: {vendor.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {metrics.map((metric) => (
+          <MetricCard key={metric.label} {...metric} />
+        ))}
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded bg-white shadow-sm ring-1 ring-black/5">
+          <div className="border-b border-gray-100 px-5 py-4">
+            <h2 className="flex items-center gap-2 font-bold text-gray-900">
+              <BarChart3 size={19} className="text-[#c45500]" />
+              Vendor performance
+            </h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {scopedPerformance.map((item) => (
+              <div key={item.vendorId} className="grid gap-4 px-5 py-4 md:grid-cols-[1fr_170px_140px_110px] md:items-center">
+                <div>
+                  <p className="font-bold text-gray-900">{vendorName(item.vendorId)}</p>
+                  <p className="text-xs text-gray-500">{item.orders.toLocaleString("en-IN")} orders · {item.conversion} conversion</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Revenue</p>
+                  <p className="font-bold">{inr(item.revenue)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Account health</p>
+                  <div className="mt-1 h-2 rounded-full bg-gray-200">
+                    <div className="h-2 rounded-full bg-[#ff9900]" style={{ width: `${item.health}%` }} />
+                  </div>
+                </div>
+                <p className={`font-bold ${item.growth.startsWith("-") ? "text-red-600" : "text-emerald-700"}`}>
+                  {item.growth}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded bg-white p-5 shadow-sm ring-1 ring-black/5">
+          <h2 className="flex items-center gap-2 font-bold text-gray-900">
+            <AlertTriangle size={19} className="text-[#c45500]" />
+            Operational alerts
+          </h2>
+          <div className="mt-4 space-y-3">
+            {scopedProducts
+              .filter((product) => product.stock < 15 || product.status === "Suppressed")
+              .map((product) => (
+                <div key={product.id} className="rounded border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-sm font-bold text-gray-900">{product.name}</p>
+                  <p className="text-xs text-gray-600">
+                    {vendorName(product.vendorId)} · {product.status} · {product.stock} units
+                  </p>
+                </div>
+              ))}
+            {scopedOrders.slice(0, 3).map((order) => (
+              <div key={order.id} className="rounded border border-gray-200 p-3">
+                <p className="text-sm font-bold text-gray-900">{order.id}</p>
+                <p className="text-xs text-gray-600">
+                  {order.status} · {vendorName(order.vendorId)} · {inr(order.total)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-5 lg:grid-cols-3">
+        {vendors.map((vendor) => (
+          <div key={vendor.id} className="rounded bg-white p-5 shadow-sm ring-1 ring-black/5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-bold text-gray-900">{vendor.name}</p>
+                <p className="text-xs text-gray-500">{vendor.category}</p>
+              </div>
+              <span className="flex items-center gap-1 rounded bg-[#fef6e7] px-2 py-1 text-xs font-bold text-[#c45500]">
+                <Star size={13} fill="currentColor" />
+                {vendor.rating}
+              </span>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">{item.label}</p>
-              <h2 className="text-2xl font-bold mt-1">{item.value}</h2>
+            <div className="mt-4 flex items-center justify-between text-sm">
+              <span className="text-gray-500">Fulfillment SLA</span>
+              <span className="font-bold text-gray-900">{vendor.sla}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-sm">
+              <span className="text-gray-500">Growth</span>
+              <span className="flex items-center gap-1 font-bold text-emerald-700">
+                <TrendingUp size={15} />
+                {performance.find((item) => item.vendorId === vendor.id)?.growth || "New"}
+              </span>
             </div>
           </div>
         ))}
-      </div>
-
-      {/* RECENT ORDERS TABLE */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        
-        {/* Table Header */}
-        <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-white">
-          <h2 className="text-lg font-semibold">Recent Orders</h2>
-          <Link 
-            to="/admin/orders" 
-            className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1"
-          >
-            View All &rarr;
-          </Link>
-        </div>
-
-        {/* Table Wrapper for responsiveness */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left whitespace-nowrap">
-            <thead className="bg-gray-50 text-gray-500 text-sm">
-              <tr>
-                <th className="px-6 py-4 font-medium">Customer</th>
-                <th className="px-6 py-4 font-medium">Date</th>
-                <th className="px-6 py-4 font-medium">Amount</th>
-                <th className="px-6 py-4 font-medium">Status</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-gray-100">
-              {recentOrders.length > 0 ? (
-                recentOrders.map((order) => (
-                  <tr key={order._id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {order.user?.name || order.customer?.name || "Unknown User"}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600 text-sm">
-                      {new Date(order.createdAt).toLocaleDateString('en-IN', {
-                        year: 'numeric', month: 'short', day: 'numeric'
-                      })}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      ₹{order.totalAmount?.toLocaleString('en-IN') || 0}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusStyle(order.status)}`}>
-                        {order.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-gray-500">
-                    No recent orders found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
+      </section>
     </div>
   );
 }

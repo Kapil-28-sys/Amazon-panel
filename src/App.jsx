@@ -12,22 +12,29 @@ import Categories from "./pages/categories/Categories";
 import Settings from "./pages/settings/Settings";
 import AddProduct from "./pages/products/AddProduct";
 import EditProduct from "./pages/products/EditProduct";
-import Login from "./pages/auth/Login";
+import Vendors from "./pages/vendors/Vendors";
+
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-		
-		<Route path="/" element={<Login />} />
-        {/* Redirect root to admin */}
-        <Route path="/" element={<Navigate to="/admin" />} />
+        <Route path="/" element={<Navigate to="/admin" replace />} />
 
         <Route
           path="/admin"
           element={
             <AdminLayout>
               <Dashboard />
+            </AdminLayout>
+          }
+        />
+
+        <Route
+          path="/admin/vendors"
+          element={
+            <AdminLayout>
+              <Vendors />
             </AdminLayout>
           }
         />

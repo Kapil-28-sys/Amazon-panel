@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Package, Tag, DollarSign, Image as ImageIcon, Save, ArrowLeft } from "lucide-react";
+import { apiUrl, assetUrl } from "../../config/api";
 
 function EditProduct() {
   const { id } = useParams();
@@ -21,11 +22,11 @@ function EditProduct() {
   const [imageFile, setImageFile] = useState(null);
 
   useEffect(() => {
-    axios.get(`https://velora-backend-production-3e79.up.railway.app/api/products/${id}`).then((res) => {
+    axios.get(apiUrl(`/api/products/${id}`)).then((res) => {
       setData(res.data);
       // Set the initial preview to the existing product image
       if (res.data.image) {
-        setPreview(`https://velora-backend-production-3e79.up.railway.app/${res.data.image}`);
+        setPreview(assetUrl(res.data.image));
       }
     });
   }, [id]);
@@ -55,7 +56,7 @@ function EditProduct() {
     if (imageFile) formData.append("image", imageFile);
 
     try {
-      await axios.put(`https://velora-backend-production-3e79.up.railway.app/api/products/${id}`, formData);
+      await axios.put(apiUrl(`/api/products/${id}`), formData);
       alert("Changes saved successfully!");
       navigate("/admin/products");
     } catch (error) {

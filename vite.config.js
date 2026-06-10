@@ -3,8 +3,5 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(), // 🔥 THIS WAS MISSING
-  ],
+  plugins: [react(), tailwindcss()],
 });
