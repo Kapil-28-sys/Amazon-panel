@@ -1,32 +1,21 @@
 import { useState } from "react";
-import { Bell, ChevronDown, LogIn, LogOut, Menu, Search, ShieldCheck, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Bell, ChevronDown, LogIn, LogOut, Menu, Search, ShieldCheck } from "lucide-react";
 import { vendors } from "../../data/marketplaceData";
+import { clearSession, getCurrentSession } from "../../config/localAuth";
 
 export default function Navbar() {
-  const [session, setSession] = useState({
-    loggedIn: true,
-    role: "Superadmin",
-    name: "Super Admin",
-  });
-  const [showLogin, setShowLogin] = useState(false);
-  const [loginRole, setLoginRole] = useState("Superadmin");
-
-  const login = (event) => {
-    event.preventDefault();
-    setSession({
-      loggedIn: true,
-      role: loginRole,
-      name: loginRole === "Vendor" ? "Vendor Admin" : "Super Admin",
-    });
-    setShowLogin(false);
-  };
+  const navigate = useNavigate();
+  const [session, setSession] = useState(getCurrentSession);
 
   const logout = () => {
+    clearSession();
     setSession({
       loggedIn: false,
       role: "Guest",
       name: "Not signed in",
     });
+    navigate("/login");
   };
 
   return (
@@ -73,7 +62,7 @@ export default function Navbar() {
           </button>
         ) : (
           <button
-            onClick={() => setShowLogin(true)}
+            onClick={() => navigate("/login")}
             className="hidden items-center gap-2 rounded bg-[#ff9900] px-3 py-2 text-sm font-bold text-[#111827] hover:bg-[#f3a847] sm:inline-flex"
           >
             <LogIn size={16} />
@@ -86,61 +75,6 @@ export default function Navbar() {
           <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#ff9900]" />
         </button>
       </div>
-
-      {showLogin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 text-gray-900 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded bg-white shadow-2xl">
-            <div className="flex items-center justify-between bg-[#232f3e] px-5 py-4 text-white">
-              <div>
-                <h2 className="text-lg font-bold">Sign in</h2>
-                <p className="text-xs text-slate-300">Choose admin or vendor panel access.</p>
-              </div>
-              <button onClick={() => setShowLogin(false)} className="rounded p-2 hover:bg-white/10">
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={login} className="space-y-4 p-5">
-              <div className="grid grid-cols-2 gap-2 rounded bg-gray-100 p-1">
-                {["Superadmin", "Vendor"].map((role) => (
-                  <button
-                    key={role}
-                    type="button"
-                    onClick={() => setLoginRole(role)}
-                    className={`rounded px-3 py-2 text-sm font-bold ${
-                      loginRole === role ? "bg-[#ff9900] text-[#111827]" : "text-gray-600"
-                    }`}
-                  >
-                    {role}
-                  </button>
-                ))}
-              </div>
-
-              <label className="block text-sm font-medium text-gray-700">
-                Email
-                <input
-                  type="email"
-                  placeholder={loginRole === "Vendor" ? "vendor@example.com" : "admin@example.com"}
-                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#ff9900] focus:ring-2 focus:ring-[#ff9900]/30"
-                />
-              </label>
-
-              <label className="block text-sm font-medium text-gray-700">
-                Password
-                <input
-                  type="password"
-                  placeholder="Password"
-                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#ff9900] focus:ring-2 focus:ring-[#ff9900]/30"
-                />
-              </label>
-
-              <button className="w-full rounded bg-[#ff9900] px-4 py-2.5 text-sm font-bold text-[#111827] hover:bg-[#f3a847]">
-                Login as {loginRole}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
     </header>
   );
 }

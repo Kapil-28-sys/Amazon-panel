@@ -19,22 +19,46 @@ import {
   vendors,
 } from "../../data/marketplaceData";
 import MetricCard from "../../components/common/MetricCard";
+import { getCurrentSession } from "../../config/localAuth";
+
+const rolePanelCopy = {
+  "Super Admin": {
+    eyebrow: "Super Admin performance center",
+    title: "Marketplace command dashboard",
+    description: "Track vendor revenue, catalog quality, order health, returns, and growth across the full marketplace.",
+  },
+  "Assistant Super Admin": {
+    eyebrow: "Assistant Super Admin operations center",
+    title: "Marketplace operations dashboard",
+    description: "Review products, customer activity, categories, orders, and operational alerts assigned to your role.",
+  },
+  Vendor: {
+    eyebrow: "Vendor performance panel",
+    title: "Vendor seller dashboard",
+    description: "Track your catalog, orders, stock alerts, account health, and recent marketplace performance.",
+  },
+};
 
 export default function Dashboard() {
-  const [vendorId, setVendorId] = useState("all");
-  const summary = summaryFor(vendorId);
+  const session = getCurrentSession();
+  const isVendor = session.role === "Vendor";
+  const panelCopy = rolePanelCopy[session.role] || rolePanelCopy["Super Admin"];
+  const [vendorId, setVendorId] = useState(isVendor ? vendors[0]?.id || "all" : "all");
+  const scopedVendorId = isVendor ? vendors[0]?.id || "all" : vendorId;
+  const summary = summaryFor(scopedVendorId);
   const scopedPerformance = useMemo(
-    () => (vendorId === "all" ? performance : performance.filter((item) => item.vendorId === vendorId)),
-    [vendorId]
+    () => (scopedVendorId === "all" ? performance : performance.filter((item) => item.vendorId === scopedVendorId)),
+    [scopedVendorId]
   );
-  const scopedOrders = vendorId === "all" ? orders : orders.filter((order) => order.vendorId === vendorId);
-  const scopedProducts = vendorId === "all" ? products : products.filter((product) => product.vendorId === vendorId);
+  const scopedOrders = scopedVendorId === "all" ? orders : orders.filter((order) => order.vendorId === scopedVendorId);
+  const scopedProducts = scopedVendorId === "all" ? products : products.filter((product) => product.vendorId === scopedVendorId);
+  const visibleVendors = scopedVendorId === "all" ? vendors : vendors.filter((vendor) => vendor.id === scopedVendorId);
 
   const metrics = [
     { label: "Revenue", value: inr(summary.revenue), icon: CircleDollarSign, tone: "green", helper: "settled marketplace revenue" },
     { label: "Orders", value: summary.orders.toLocaleString("en-IN"), icon: ClipboardList, tone: "blue", helper: "last 30 days" },
     { label: "Products", value: summary.products, icon: Box, tone: "purple", helper: `${summary.lowStock} need stock action` },
-    { label: "Vendors", value: vendorId === "all" ? vendors.length : 1, icon: Building2, tone: "orange", helper: "active seller panels" },
+    { label: isVendor ? "Panel" : "Vendors", value: isVendor ? "Vendor" : scopedVendorId === "all" ? vendors.length : 1, icon: Building2, tone: "orange", helper: isVendor ? "seller access" : "active seller panels" },
   ];
 
   return (
@@ -43,28 +67,30 @@ export default function Dashboard() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-[#ff9900]">
-              {vendorId === "all" ? "Superadmin performance center" : "Vendor performance panel"}
+              {panelCopy.eyebrow}
             </p>
             <h1 className="mt-1 text-2xl font-bold">
-              {vendorId === "all" ? "Marketplace command dashboard" : vendorName(vendorId)}
+              {isVendor ? vendorName(scopedVendorId) : panelCopy.title}
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-slate-300">
-              Track vendor revenue, catalog quality, order health, returns, and growth in one Amazon-style operations view.
+              {panelCopy.description}
             </p>
           </div>
 
-          <select
-            value={vendorId}
-            onChange={(event) => setVendorId(event.target.value)}
-            className="w-full rounded border border-white/20 bg-white px-3 py-2 text-sm font-medium text-gray-900 outline-none lg:w-72"
-          >
-            <option value="all">Superadmin: All vendors</option>
-            {vendors.map((vendor) => (
-              <option key={vendor.id} value={vendor.id}>
-                Vendor: {vendor.name}
-              </option>
-            ))}
-          </select>
+          {!isVendor && (
+            <select
+              value={vendorId}
+              onChange={(event) => setVendorId(event.target.value)}
+              className="w-full rounded border border-white/20 bg-white px-3 py-2 text-sm font-medium text-gray-900 outline-none lg:w-72"
+            >
+              <option value="all">All vendors</option>
+              {vendors.map((vendor) => (
+                <option key={vendor.id} value={vendor.id}>
+                  Vendor: {vendor.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </section>
 
@@ -136,7 +162,7 @@ export default function Dashboard() {
       </section>
 
       <section className="grid gap-5 lg:grid-cols-3">
-        {vendors.map((vendor) => (
+        {visibleVendors.map((vendor) => (
           <div key={vendor.id} className="rounded bg-white p-5 shadow-sm ring-1 ring-black/5">
             <div className="flex items-start justify-between gap-4">
               <div>

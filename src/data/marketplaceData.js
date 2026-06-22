@@ -107,15 +107,15 @@ export const orders = [
   { id: "ORD-10091", vendorId: "vdr-apex", customer: "Priya Sharma", date: "03 Jun 2026", status: "Shipped", total: 6598, items: 2, channel: "Prime" },
   { id: "ORD-10090", vendorId: "vdr-home", customer: "Arjun Patel", date: "03 Jun 2026", status: "Pending", total: 2499, items: 1, channel: "Amazon.in" },
   { id: "ORD-10087", vendorId: "vdr-style", customer: "Meera Nair", date: "02 Jun 2026", status: "Returned", total: 1499, items: 1, channel: "Amazon.in" },
-  { id: "ORD-10084", vendorId: "vdr-apex", customer: "Nitin Verma", date: "02 Jun 2026", status: "Delivered", total: 1199, items: 1, channel: "Prime" },
-  { id: "ORD-10078", vendorId: "vdr-home", customer: "Sara Khan", date: "01 Jun 2026", status: "Delivered", total: 3598, items: 2, channel: "Amazon.in" },
+  { id: "ORD-10084", vendorId: "vdr-apex", customer: "kaps sharma", date: "02 Jun 2026", status: "Delivered", total: 1199, items: 1, channel: "Prime" },
+  { id: "ORD-10078", vendorId: "vdr-home", customer: "Rahul verma", date: "01 Jun 2026", status: "Delivered", total: 3598, items: 2, channel: "Amazon.in" },
 ];
 
 export const customers = [
   { id: "CUS-01", vendorId: "vdr-apex", name: "Priya Sharma", email: "priya@example.com", orders: 7, ltv: 28640, status: "Repeat" },
   { id: "CUS-02", vendorId: "vdr-home", name: "Arjun Patel", email: "arjun@example.com", orders: 3, ltv: 8197, status: "Active" },
   { id: "CUS-03", vendorId: "vdr-style", name: "Meera Nair", email: "meera@example.com", orders: 2, ltv: 2998, status: "Return Risk" },
-  { id: "CUS-04", vendorId: "vdr-apex", name: "Nitin Verma", email: "nitin@example.com", orders: 5, ltv: 14890, status: "Active" },
+  { id: "CUS-04", vendorId: "vdr-apex", name: "kaps sharma", email: "nitin@example.com", orders: 5, ltv: 14890, status: "Active" },
 ];
 
 export const performance = [

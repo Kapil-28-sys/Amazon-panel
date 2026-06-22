@@ -54,7 +54,7 @@ export default function Vendors() {
       name: "",
       owner: "",
       email: "",
-      category: "General Merchandise",
+      category: "",
       city: "",
     });
     setShowForm(false);
