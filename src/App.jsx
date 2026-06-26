@@ -11,6 +11,7 @@ import Orders from "./pages/orders/Orders";
 import Users from "./pages/users/Users";
 import Categories from "./pages/categories/Categories";
 import SubCategories from "./pages/subcategory/SubCategories"; // ✅ Capital S + C
+import SubToSubCategory from "./pages/subtosubcategory/SubToSubCategory";
 import Categoryattribute from "./pages/categoryattribute/CategoryAttribute"; // ✅ Capital S + C
 
 import Settings from "./pages/settings/Settings";
@@ -91,12 +92,20 @@ export default function App() {
             </ProtectedAdminPage>
           }
         />
+        <Route
+          path="/admin/subtosubcategory"
+          element={
+            <ProtectedAdminPage>
+              <SubToSubCategory />
+            </ProtectedAdminPage>
+          }
+        />
 
         <Route
           path="/admin/categoryattribute"
           element={
             <ProtectedAdminPage>
-              <Categoryattribute />  
+              <Categoryattribute />
             </ProtectedAdminPage>
           }
         />

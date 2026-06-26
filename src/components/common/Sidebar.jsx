@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   BarChart3,
@@ -31,8 +31,9 @@ const navItems = [
       { name: "Category", path: "/admin/categories" },
       { name: "Sub Category", path: "/admin/subcategory" },
       { name: "Sub to Sub Category", path: "/admin/subtosubcategory" },
-      { name: "categoryattribute", path: "/admin/categoryattribute" },
-
+      // ✅ FIX 1: Changed label from "categoryattribute" to "Category Attribute"
+      // BUG: The label was all lowercase with no spaces — looked broken in the sidebar UI
+      { name: "Category Attribute", path: "/admin/categoryattribute" },
     ],
     roles: ["Super Admin", "Assistant Super Admin"],
   },
@@ -91,7 +92,33 @@ export default function Sidebar() {
   const [openSections, setOpenSections] = useState(() =>
     Object.fromEntries(vendorNavSections.map((section) => [section.name, true]))
   );
-  const [openCategories, setOpenCategories] = useState(false);
+
+  // ✅ FIX 2: openCategories was always starting as false and had no logic to
+  // auto-open when you navigate directly to a categories route via URL.
+  // Now it initializes based on whether the current URL matches a categories sub-path.
+  const [openCategories, setOpenCategories] = useState(() => {
+    const catItem = navItems.find((i) => i.items);
+    if (!catItem) return false;
+    return catItem.items.some(
+      (sub) =>
+        location.pathname === sub.path ||
+        location.pathname.startsWith(sub.path + "/")
+    );
+  });
+
+  // ✅ FIX 3: Auto-open the accordion when navigating to a categories sub-route
+  // BUG: Without this, refreshing the page or deep-linking to /admin/categoryattribute
+  // would leave the accordion closed even though you're on that page.
+  useEffect(() => {
+    const catItem = navItems.find((i) => i.items);
+    if (!catItem) return;
+    const isActive = catItem.items.some(
+      (sub) =>
+        location.pathname === sub.path ||
+        location.pathname.startsWith(sub.path + "/")
+    );
+    if (isActive) setOpenCategories(true);
+  }, [location.pathname]);
 
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 rounded px-3 py-2.5 text-sm font-medium transition ${
@@ -181,9 +208,22 @@ export default function Sidebar() {
 
               // ── Categories accordion ──────────────────────────────
               if (item.items) {
-                const isActiveSection = item.items.some((sub) =>
-                  location.pathname.startsWith(sub.path)
+                // ✅ FIX 4: THE MAIN BUG — startsWith("/admin/categories") was
+                // ALSO matching "/admin/categoryattribute" because the string
+                // "/admin/categoryattribute" literally starts with "/admin/categor".
+                //
+                // This caused isActiveSection to be TRUE when you were on the
+                // categoryattribute page, which made React think the accordion
+                // was in a weird active state and broke the click toggle behavior.
+                //
+                // The fix: always append "/" when checking startsWith so that
+                // "/admin/categories/" does NOT match "/admin/categoryattribute".
+                const isActiveSection = item.items.some(
+                  (sub) =>
+                    location.pathname === sub.path ||
+                    location.pathname.startsWith(sub.path + "/")
                 );
+
                 return (
                   <div key={item.name} className="space-y-1">
                     <button
@@ -206,6 +246,11 @@ export default function Sidebar() {
                           <NavLink
                             key={sub.path}
                             to={sub.path}
+                            // ✅ FIX 5: NavLink's isActive prop also uses startsWith internally.
+                            // For paths like /admin/categories, it would wrongly highlight
+                            // the "Category" link when on /admin/categoryattribute.
+                            // Using end={true} forces an exact match for the parent path.
+                            end
                             className={({ isActive }) =>
                               `block rounded px-3 py-2 text-sm transition ${
                                 isActive

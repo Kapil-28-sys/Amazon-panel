@@ -16,7 +16,7 @@ export const LOCAL_USERS = [
       "/admin/categories",
       "/admin/subcategory",
       "/admin/subtosubcategory",
-      "/admin/categoryattribute",  // ✅ add this
+      "/admin/categoryattribute",    // ✅ add this
       "/admin/settings",
     ],
   },
@@ -46,8 +46,9 @@ export const LOCAL_USERS = [
     vendorId: "vdr-apex",
     defaultPath: "/vendor/products",
     allowedPaths: [
-      "/vendor/products",
-      "/vendor/products/add",
+     "/admin/products",
+      "/admin/products/add",
+      "/admin/products/edit",
       "/vendor/products/inventory",
       "/vendor/orders",
       "/vendor/orders/returns",

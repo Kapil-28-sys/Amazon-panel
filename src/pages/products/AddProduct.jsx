@@ -1,454 +1,639 @@
+// AddProduct.jsx
+// path: src/pages/products/AddProduct.jsx
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import {
-  Package, Tag, DollarSign, Image as ImageIcon,
-  Upload, CheckCircle, ChevronDown, Layers, Hash,
-  BarChart2, ShoppingBag, Percent, ArrowLeft
-} from "lucide-react";
-import { apiUrl } from "../../config/api";
+import { ChevronRight, ArrowLeft, PackagePlus, ShieldCheck } from "lucide-react";
+import { getCurrentSession } from "../../config/localAuth";
 
-// ─── tiny helpers ────────────────────────────────────────────────────────────
-const Field = ({ label, children }) => (
-  <div>
-    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-      {label}
-    </label>
-    {children}
-  </div>
-);
+const BASE_URL = "https://amazon-multi-vendor-3.onrender.com/api";
+const ADD_URL  = "https://amazon-multi-vendor-3.onrender.com/api/products/add";
+
+// ── Super admin ke liye fixed vendorId (localAuth mein bhi same rakho) ──
+const SUPER_ADMIN_VENDOR_ID = "6a2926ad76ab1ef00da7b71c";
 
 const inputCls =
-  "w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all";
+  "mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none " +
+  "focus:border-[#ff9900] focus:ring-2 focus:ring-[#ff9900]/30 bg-white";
 
-const SectionHeader = ({ icon: Icon, color, children }) => (
-  <h3 className={`flex items-center gap-2 font-bold text-base mb-5 text-slate-700 pb-3 border-b border-slate-100`}>
-    <Icon size={18} className={color} /> {children}
-  </h3>
-);
+function generateSlug(text) {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
-// ─── component ───────────────────────────────────────────────────────────────
-function AddProduct() {
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [preview, setPreview] = useState(null);
+function dedupeAttrs(raw) {
+  const seen = new Set();
+  return raw.filter(({ name }) =>
+    seen.has(name) ? false : (seen.add(name), true)
+  );
+}
 
-  // dropdown data
-  const [categories, setCategories] = useState([]);
-  const [subCategories, setSubCategories] = useState([]);
-  const [subToSubs, setSubToSubs] = useState([]);
-  const [vendors, setVendors] = useState([]);
+// ── Vendor ID resolver ───────────────────────────────────────
+// Super admin → fixed SUPER_ADMIN_VENDOR_ID
+// Vendor      → vendorId from session
+function resolveVendorId(session) {
+  if (!session?.loggedIn) return null;
+  const role = session.role?.toLowerCase().replace(/[\s_-]/g, "");
+  if (role === "superadmin" || role === "admin") return SUPER_ADMIN_VENDOR_ID;
+  return session.vendorId || null;
+}
 
-  // image files (thumbnail + gallery)
-  const [thumbnailFile, setThumbnailFile] = useState(null);
-  const [galleryFiles, setGalleryFiles] = useState([]);
-  const [galleryPreviews, setGalleryPreviews] = useState([]);
+function AttrField({ attr, value, onChange }) {
+  const change = (e) => onChange(attr._id, e.target.value);
+  const label = (
+    <>
+      {attr.name}
+      {attr.required && <span className="ml-1 text-red-500">*</span>}
+    </>
+  );
 
-  const [data, setData] = useState({
-    vendorId: "",
-    productName: "",
-    categoryId: "",
-    subCategoryId: "",
-    subToSubCategoryId: "",
-    brand: "",
-    sku: "",
-    price: "",
-    salePrice: "",
-    discount: "",
-    minQuantity: 1,
-    maxQuantity: "",
-    stock: "",
-    description: "",
-    status: "active",
-  });
-
-  // ── fetch vendors & categories on mount ─────────────────────────────────
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [catRes, vendorRes] = await Promise.all([
-          axios.get(apiUrl("/api/categories")),
-          axios.get(apiUrl("/api/vendors")),
-        ]);
-        setCategories(catRes.data?.categories || catRes.data || []);
-        setVendors(vendorRes.data?.vendors || vendorRes.data || []);
-      } catch (err) {
-        console.error("Failed to fetch init data", err);
-      }
-    };
-    load();
-  }, []);
-
-  // ── fetch sub-categories when category changes ────────────────────────────
-  useEffect(() => {
-    if (!data.categoryId) { setSubCategories([]); setSubToSubs([]); return; }
-    const fetch = async () => {
-      try {
-        const res = await axios.get(apiUrl(`/api/subcategories?categoryId=${data.categoryId}`));
-        setSubCategories(res.data?.subCategories || res.data || []);
-        setSubToSubs([]);
-        setData(d => ({ ...d, subCategoryId: "", subToSubCategoryId: "" }));
-      } catch (err) { console.error(err); }
-    };
-    fetch();
-  }, [data.categoryId]);
-
-  // ── fetch sub-to-sub when sub-category changes ────────────────────────────
-  useEffect(() => {
-    if (!data.subCategoryId) { setSubToSubs([]); return; }
-    const fetch = async () => {
-      try {
-        const res = await axios.get(apiUrl(`/api/subtosubcategories?subCategoryId=${data.subCategoryId}`));
-        setSubToSubs(res.data?.subToSubCategories || res.data || []);
-        setData(d => ({ ...d, subToSubCategoryId: "" }));
-      } catch (err) { console.error(err); }
-    };
-    fetch();
-  }, [data.subCategoryId]);
-
-  const handleChange = (e) => setData({ ...data, [e.target.name]: e.target.value });
-
-  // ── thumbnail ────────────────────────────────────────────────────────────
-  const handleThumbnail = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setThumbnailFile(file);
-    setPreview(URL.createObjectURL(file));
-  };
-
-  // ── gallery (multiple) ───────────────────────────────────────────────────
-  const handleGallery = (e) => {
-    const files = Array.from(e.target.files);
-    setGalleryFiles(files);
-    setGalleryPreviews(files.map(f => URL.createObjectURL(f)));
-  };
-
-  // ── submit ───────────────────────────────────────────────────────────────
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-
-    const formData = new FormData();
-    Object.entries(data).forEach(([k, v]) => { if (v !== "") formData.append(k, v); });
-    if (thumbnailFile) formData.append("thumbnailImage", thumbnailFile);
-    galleryFiles.forEach(f => formData.append("images", f));
-
-    try {
-      await axios.post(apiUrl("/api/products/add"), formData);
-      alert("Product added successfully!");
-      navigate("/admin/products");
-    } catch (err) {
-      alert("Failed to add product.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── derived ──────────────────────────────────────────────────────────────
-  const categorySelected = !!data.categoryId;
-  const subCategorySelected = !!data.subCategoryId;
+  if (attr.type === "dropdown") {
+    return (
+      <label className="block text-sm font-medium text-gray-700">
+        {label}
+        <select value={value} onChange={change} className={inputCls}>
+          <option value="">Select…</option>
+          {attr.options.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </label>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-5 md:p-8 text-slate-800">
-      <div className="max-w-5xl mx-auto">
+    <label className="block text-sm font-medium text-gray-700">
+      {label}
+      <input
+        type={attr.type === "number" ? "number" : "text"}
+        value={value}
+        onChange={change}
+        placeholder={`Enter ${attr.name.toLowerCase()}`}
+        className={inputCls}
+      />
+    </label>
+  );
+}
 
-        {/* Back */}
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 transition mb-5 group text-sm"
-        >
-          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-          Back to Products
-        </button>
+function StepBadge({ n, label, active, done }) {
+  return (
+    <div className={`flex items-center gap-2 ${active ? "opacity-100" : done ? "opacity-70" : "opacity-30"}`}>
+      <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+        done ? "bg-emerald-500 text-white" : active ? "bg-[#ff9900] text-[#111]" : "bg-gray-200 text-gray-500"
+      }`}>
+        {done ? "✓" : n}
+      </span>
+      <span className={`text-sm font-semibold ${active ? "text-gray-900" : "text-gray-500"}`}>
+        {label}
+      </span>
+    </div>
+  );
+}
 
-        {/* Header */}
-        <div className="mb-7">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Add New Product</h1>
-          <p className="text-slate-500 text-sm mt-1">Fill in the details below to list a product on the marketplace.</p>
+function SeoTab({ seo, setSeo, slug, productName }) {
+  const descLen  = seo.metaDesc.length;
+  const titleLen = seo.metaTitle.length;
+  const descColor =
+    descLen > 160 ? "#ef4444" : descLen > 130 ? "#f59e0b" : descLen > 0 ? "#22c55e" : "#94a3b8";
+
+  return (
+    <div className="space-y-5">
+      <label className="block text-sm font-medium text-gray-700">
+        <div className="flex items-center justify-between">
+          <span>Meta Title</span>
+          <span className={`text-xs ${titleLen > 60 ? "text-red-500" : "text-gray-400"}`}>{titleLen}/60</span>
         </div>
+        <input
+          value={seo.metaTitle}
+          onChange={(e) => setSeo((s) => ({ ...s, metaTitle: e.target.value }))}
+          maxLength={70}
+          placeholder="Title shown in Google results…"
+          className={inputCls}
+        />
+      </label>
 
-        {/* Progress hint */}
-        <div className="flex items-center gap-2 mb-7 text-xs font-medium">
-          {[
-            { label: "1. Category", done: categorySelected },
-            { label: "2. Sub-Category", done: subCategorySelected },
-            { label: "3. Product Details", done: false },
-          ].map((step, i) => (
-            <span key={i} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${step.done ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-400"}`}>
-              {step.done && <CheckCircle size={12} />} {step.label}
-            </span>
-          ))}
+      <label className="block text-sm font-medium text-gray-700">
+        <div className="flex items-center justify-between">
+          <span>Meta Description</span>
+          <span className="text-xs font-semibold" style={{ color: descColor }}>{descLen}/160</span>
         </div>
+        <textarea
+          value={seo.metaDesc}
+          onChange={(e) => setSeo((s) => ({ ...s, metaDesc: e.target.value }))}
+          rows={3}
+          placeholder="Short description shown under the title in Google…"
+          className={`${inputCls} resize-none`}
+        />
+      </label>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+      <label className="block text-sm font-medium text-gray-700">
+        Keywords <span className="ml-1 text-xs font-normal text-gray-400">(comma separated)</span>
+        <input
+          value={seo.keywords}
+          onChange={(e) => setSeo((s) => ({ ...s, keywords: e.target.value }))}
+          placeholder="running shoes, nike, sports footwear"
+          className={inputCls}
+        />
+      </label>
 
-          {/* ── STEP 1: Category Selection ──────────────────────────────── */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <SectionHeader icon={Tag} color="text-orange-500">
-              Category Selection
-            </SectionHeader>
-            <div className="grid md:grid-cols-3 gap-5">
-
-              {/* Category */}
-              <Field label="Category *">
-                <div className="relative">
-                  <select
-                    name="categoryId"
-                    value={data.categoryId}
-                    onChange={handleChange}
-                    className={`${inputCls} appearance-none cursor-pointer pr-9`}
-                    required
-                  >
-                    <option value="">Select category</option>
-                    {categories.map(c => (
-                      <option key={c._id} value={c._id}>{c.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                </div>
-              </Field>
-
-              {/* Sub-Category */}
-              <Field label="Sub-Category">
-                <div className="relative">
-                  <select
-                    name="subCategoryId"
-                    value={data.subCategoryId}
-                    onChange={handleChange}
-                    className={`${inputCls} appearance-none cursor-pointer pr-9 ${!categorySelected ? "opacity-50 cursor-not-allowed" : ""}`}
-                    disabled={!categorySelected}
-                  >
-                    <option value="">
-                      {!categorySelected ? "Select category first" : "Select sub-category"}
-                    </option>
-                    {subCategories.map(s => (
-                      <option key={s._id} value={s._id}>{s.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                </div>
-              </Field>
-
-              {/* Sub-to-Sub */}
-              <Field label="Sub-Sub-Category">
-                <div className="relative">
-                  <select
-                    name="subToSubCategoryId"
-                    value={data.subToSubCategoryId}
-                    onChange={handleChange}
-                    className={`${inputCls} appearance-none cursor-pointer pr-9 ${!subCategorySelected ? "opacity-50 cursor-not-allowed" : ""}`}
-                    disabled={!subCategorySelected}
-                  >
-                    <option value="">
-                      {!subCategorySelected ? "Select sub-category first" : "Select (optional)"}
-                    </option>
-                    {subToSubs.map(s => (
-                      <option key={s._id} value={s._id}>{s.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                </div>
-              </Field>
-
-            </div>
-          </div>
-
-          {/* ── STEP 2: General Info ─────────────────────────────────────── */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <SectionHeader icon={Package} color="text-blue-500">
-              General Information
-            </SectionHeader>
-            <div className="grid md:grid-cols-2 gap-5">
-
-              <Field label="Vendor">
-                <div className="relative">
-                  <select
-                    name="vendorId"
-                    value={data.vendorId}
-                    onChange={handleChange}
-                    className={`${inputCls} appearance-none cursor-pointer pr-9`}
-                    required
-                  >
-                    <option value="">Select vendor</option>
-                    {vendors.map(v => (
-                      <option key={v._id} value={v._id}>{v.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                </div>
-              </Field>
-
-              <Field label="Product Name *">
-                <input name="productName" placeholder="e.g. iPhone 15 Pro Max" onChange={handleChange} className={inputCls} required />
-              </Field>
-
-              <Field label="Brand">
-                <input name="brand" placeholder="e.g. Apple" onChange={handleChange} className={inputCls} />
-              </Field>
-
-              <Field label="SKU">
-                <div className="relative">
-                  <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input name="sku" placeholder="APL-IP15PM-256" onChange={handleChange} className={`${inputCls} pl-8`} />
-                </div>
-              </Field>
-
-              <div className="md:col-span-2">
-                <Field label="Description *">
-                  <textarea
-                    name="description"
-                    placeholder="Describe the product for customers..."
-                    onChange={handleChange}
-                    className={`${inputCls} h-32 resize-none`}
-                    required
-                  />
-                </Field>
-              </div>
-
-            </div>
-          </div>
-
-          {/* ── STEP 3: Pricing ──────────────────────────────────────────── */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <SectionHeader icon={DollarSign} color="text-green-500">
-              Pricing & Inventory
-            </SectionHeader>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-
-              <Field label="MRP (₹) *">
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
-                  <input name="price" type="number" placeholder="149999" onChange={handleChange} className={`${inputCls} pl-7`} required />
-                </div>
-              </Field>
-
-              <Field label="Sale Price (₹)">
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
-                  <input name="salePrice" type="number" placeholder="139999" onChange={handleChange} className={`${inputCls} pl-7`} />
-                </div>
-              </Field>
-
-              <Field label="Discount %">
-                <div className="relative">
-                  <Percent size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input name="discount" type="number" placeholder="7" onChange={handleChange} className={`${inputCls} pr-7`} />
-                </div>
-              </Field>
-
-              <Field label="Stock *">
-                <div className="relative">
-                  <BarChart2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input name="stock" type="number" placeholder="50" onChange={handleChange} className={`${inputCls} pl-8`} required />
-                </div>
-              </Field>
-
-              <Field label="Min Qty">
-                <input name="minQuantity" type="number" defaultValue={1} onChange={handleChange} className={inputCls} />
-              </Field>
-
-              <Field label="Max Qty">
-                <input name="maxQuantity" type="number" placeholder="5" onChange={handleChange} className={inputCls} />
-              </Field>
-
-            </div>
-          </div>
-
-          {/* ── STEP 4: Images ───────────────────────────────────────────── */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <SectionHeader icon={ImageIcon} color="text-purple-500">
-              Product Images
-            </SectionHeader>
-            <div className="grid md:grid-cols-2 gap-6">
-
-              {/* Thumbnail */}
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Thumbnail Image *</p>
-                <label className="relative group border-2 border-dashed border-slate-200 rounded-2xl p-4 flex flex-col items-center justify-center min-h-[200px] bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer">
-                  {preview ? (
-                    <div className="relative w-full">
-                      <img src={preview} className="h-44 w-full object-contain rounded-xl" alt="Thumbnail" />
-                      <div className="absolute inset-0 bg-white/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl">
-                        <p className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">Change</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <Upload className="mx-auto text-slate-300 mb-2" size={28} />
-                      <p className="text-sm font-medium text-slate-500">Upload thumbnail</p>
-                      <p className="text-xs text-slate-400 mt-1">Main display image</p>
-                    </div>
-                  )}
-                  <input type="file" accept="image/*" onChange={handleThumbnail} className="absolute inset-0 opacity-0 cursor-pointer" required />
-                </label>
-              </div>
-
-              {/* Gallery */}
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Gallery Images</p>
-                <label className="relative group border-2 border-dashed border-slate-200 rounded-2xl p-4 flex flex-col items-center justify-center min-h-[200px] bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer">
-                  {galleryPreviews.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2 w-full">
-                      {galleryPreviews.map((src, i) => (
-                        <img key={i} src={src} className="h-20 w-full object-cover rounded-lg" alt={`gallery-${i}`} />
-                      ))}
-                      <div className="h-20 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center">
-                        <p className="text-xs text-slate-400 font-medium">Change</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <Layers className="mx-auto text-slate-300 mb-2" size={28} />
-                      <p className="text-sm font-medium text-slate-500">Upload multiple</p>
-                      <p className="text-xs text-slate-400 mt-1">Hold Ctrl/Cmd to select many</p>
-                    </div>
-                  )}
-                  <input type="file" accept="image/*" multiple onChange={handleGallery} className="absolute inset-0 opacity-0 cursor-pointer" />
-                </label>
-              </div>
-
-            </div>
-          </div>
-
-          {/* ── Status + Actions ─────────────────────────────────────────── */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <SectionHeader icon={ShoppingBag} color="text-indigo-500">
-              Listing Status
-            </SectionHeader>
-            <div className="flex items-center gap-4 flex-wrap">
-              {["active", "inactive", "draft"].map(s => (
-                <label key={s} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm font-semibold capitalize ${data.status === s ? "border-blue-500 bg-blue-50 text-blue-600" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>
-                  <input type="radio" name="status" value={s} checked={data.status === s} onChange={handleChange} className="hidden" />
-                  {s}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Submit ───────────────────────────────────────────────────── */}
-          <div className="flex gap-3 pb-6">
-            <button
-              type="submit"
-              disabled={loading}
-              className={`flex items-center gap-2 font-bold px-8 py-3.5 rounded-xl shadow-lg text-white transition-all ${loading ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 shadow-blue-200 active:scale-[0.98]"}`}
-            >
-              {!loading && <CheckCircle size={17} />}
-              {loading ? "Publishing..." : "Publish Product"}
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="px-6 py-3.5 rounded-xl bg-white border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-all"
-            >
-              Discard
-            </button>
-          </div>
-
-        </form>
+      <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4">
+        <p className="mb-3 text-xs font-bold uppercase tracking-wide text-gray-400">Google preview</p>
+        <div className="rounded border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="mb-0.5 text-xs text-[#006621]">
+            yoursite.com/products/<span className="font-medium">{slug || "product-slug"}</span>
+          </p>
+          <p className="text-lg font-medium leading-snug text-[#1a0dab] cursor-default">
+            {seo.metaTitle || productName || "Product Title — Your Store"}
+          </p>
+          <p className="mt-1 text-sm leading-snug text-gray-600">
+            {seo.metaDesc ? seo.metaDesc.slice(0, 160) : "Your meta description will appear here…"}
+          </p>
+        </div>
+        <p className="mt-2 text-xs text-gray-400">Approximation of Google search appearance.</p>
       </div>
     </div>
   );
 }
 
-export default AddProduct;
+// ════════════════════════════════════════════════════════════
+export default function AddProduct() {
+  const navigate   = useNavigate();
+  const session    = getCurrentSession();
+  const vendorId   = resolveVendorId(session);
+  const isSuperAdmin = session.role?.toLowerCase().replace(/[\s_-]/g, "") === "superadmin"
+                    || session.role?.toLowerCase().replace(/[\s_-]/g, "") === "admin";
+
+  const [step, setStep] = useState(1);
+
+  const [categories,      setCategories]      = useState([]);
+  const [subCategories,   setSubCategories]   = useState([]);
+  const [catLoading,      setCatLoading]      = useState(false);
+  const [subCatLoading,   setSubCatLoading]   = useState(false);
+  const [selectedCat,     setSelectedCat]     = useState("");
+  const [selectedSub,     setSelectedSub]     = useState("");
+  const [selectedCatName, setSelectedCatName] = useState("");
+  const [selectedSubName, setSelectedSubName] = useState("");
+
+  const [attributes,  setAttributes]  = useState([]);
+  const [attrValues,  setAttrValues]  = useState({});
+  const [attrLoading, setAttrLoading] = useState(false);
+
+  const [form, setForm] = useState({ productName: "", sku: "", price: "", stock: "" });
+  const [slug,       setSlug]       = useState("");
+  const [slugEdited, setSlugEdited] = useState(false);
+  const [seo,        setSeo]        = useState({ metaTitle: "", metaDesc: "", keywords: "" });
+  const [activeTab,  setActiveTab]  = useState("details");
+  const [submitting,  setSubmitting]  = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  useEffect(() => {
+    setCatLoading(true);
+    fetch(`${BASE_URL}/categories`)
+      .then((r) => r.json())
+      .then((d) => setCategories(Array.isArray(d) ? d : (d.data ?? [])))
+      .catch(console.error)
+      .finally(() => setCatLoading(false));
+  }, []);
+
+  const handleNameChange = (val) => {
+    setForm((f) => ({ ...f, productName: val }));
+    if (!slugEdited) setSlug(generateSlug(val));
+    if (!seo.metaTitle) setSeo((s) => ({ ...s, metaTitle: val }));
+  };
+
+  const handleCatChange = async (catId) => {
+    const cat = categories.find((c) => c._id === catId);
+    setSelectedCat(catId);
+    setSelectedCatName(cat?.name ?? "");
+    setSelectedSub(""); setSelectedSubName("");
+    setSubCategories([]); setAttributes([]); setAttrValues({});
+    if (!catId) return;
+    setSubCatLoading(true);
+    try {
+      const res  = await fetch(`${BASE_URL}/subcategories`);
+      const data = await res.json();
+      const all  = Array.isArray(data) ? data : (data.data ?? data.subcategories ?? []);
+      setSubCategories(all.filter((s) => s.categoryId?._id === catId));
+    } catch (e) { console.error(e); }
+    finally { setSubCatLoading(false); }
+  };
+
+  const handleSubChange = async (subId) => {
+    const sub = subCategories.find((s) => s._id === subId);
+    setSelectedSub(subId);
+    setSelectedSubName(sub?.name ?? "");
+    setAttributes([]); setAttrValues({});
+    if (!subId) return;
+    setAttrLoading(true);
+    try {
+      const res     = await fetch(`${BASE_URL}/categoryattribute/category/${selectedCat}`);
+      const json    = await res.json();
+      const raw     = Array.isArray(json) ? json : (json.data ?? []);
+      const deduped = dedupeAttrs(raw);
+      const defaults = {};
+      deduped.forEach((a) => { defaults[a._id] = ""; });
+      setAttributes(deduped);
+      setAttrValues(defaults);
+    } catch (e) { console.error(e); }
+    finally { setAttrLoading(false); }
+  };
+
+  const addListing = async () => {
+    setSubmitError("");
+
+    if (!vendorId) {
+      setSubmitError("Vendor ID not found. Please log in again.");
+      return;
+    }
+
+    const attributesPayload = attributes.map((a) => ({
+      attributeId: a._id,
+      name:        a.name,
+      value:       attrValues[a._id] ?? "",
+    }));
+
+    const payload = {
+      vendorId,
+      productName:     form.productName,
+      sku:             form.sku,
+      price:           Number(form.price  || 0),
+      stock:           Number(form.stock  || 0),
+      categoryId:      selectedCat,
+      subCategoryId:   selectedSub,
+      attributes:      attributesPayload,
+      slug:            slug || generateSlug(form.productName),
+      metaTitle:       seo.metaTitle || form.productName,
+      metaDescription: seo.metaDesc,
+      metaKeywords:    seo.keywords,
+    };
+
+    console.log("📦 Submitting payload:", JSON.stringify(payload, null, 2));
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(ADD_URL, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(payload),
+      });
+
+      const responseText = await res.text();
+      console.log(`📨 Response ${res.status}:`, responseText);
+
+      if (!res.ok) {
+        let errMsg = `Server error ${res.status}`;
+        try {
+          const errJson = JSON.parse(responseText);
+          errMsg = errJson.message || errJson.error || errJson.msg || errMsg;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
+
+      navigate("/admin/products", { state: { added: true } });
+    } catch (e) {
+      console.error("❌ Submit error:", e);
+      setSubmitError(e.message || "Failed to save. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const step1Ready      = selectedCat && selectedSub && !attrLoading;
+  const requiredMissing = attributes.filter((a) => a.required).some((a) => !attrValues[a._id]?.toString().trim());
+  const canSubmit       = form.productName.trim() && form.sku.trim() && !requiredMissing && !submitting && !!vendorId;
+
+  const tabCls = (t) =>
+    `px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+      activeTab === t
+        ? "border-[#ff9900] text-[#c45500]"
+        : "border-transparent text-gray-500 hover:text-gray-700"
+    }`;
+
+  return (
+    <div className="space-y-5">
+
+      {/* ── Page header ── */}
+      <div className="rounded bg-white p-5 shadow-sm ring-1 ring-black/5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/admin/products")}
+              className="flex items-center gap-1.5 rounded border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              <ArrowLeft size={15} /> Back
+            </button>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-[#c45500]">Inventory command center</p>
+              <h1 className="mt-0.5 text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <PackagePlus size={22} className="text-[#ff9900]" />
+                Add marketplace listing
+              </h1>
+            </div>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-3">
+            <StepBadge n={1} label="Choose category" active={step === 1} done={step > 1} />
+            <ChevronRight size={14} className="text-gray-400" />
+            <StepBadge n={2} label="Fill & submit"   active={step === 2} done={false} />
+          </div>
+        </div>
+
+        <div className="sm:hidden mt-3 flex items-center gap-3">
+          <StepBadge n={1} label="Choose category" active={step === 1} done={step > 1} />
+          <ChevronRight size={14} className="text-gray-400" />
+          <StepBadge n={2} label="Fill & submit"   active={step === 2} done={false} />
+        </div>
+
+        {/* Vendor ID banner */}
+        <div className={`mt-4 flex items-center gap-2 rounded border px-4 py-2 text-xs ${
+          vendorId
+            ? "border-amber-200 bg-amber-50 text-amber-700"
+            : "border-red-200 bg-red-50 text-red-700"
+        }`}>
+          <ShieldCheck size={14} className="shrink-0" />
+          {vendorId ? (
+            <span>
+              {isSuperAdmin ? "Super Admin" : session.name} —{" "}
+              Vendor ID: <strong className="font-mono">{vendorId}</strong>
+            </span>
+          ) : (
+            <span>⚠️ Vendor ID not found — please log out and log back in.</span>
+          )}
+        </div>
+      </div>
+
+      {/* ══ STEP 1 ══ */}
+      {step === 1 && (
+        <div className="overflow-hidden rounded bg-white shadow-sm ring-1 ring-black/5">
+          <div className="border-b border-gray-100 px-6 py-4">
+            <h2 className="font-bold text-gray-900">Step 1 — Choose category</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Select a category and sub-category. Product attribute fields will load automatically.
+            </p>
+          </div>
+
+          <div className="p-6 space-y-5">
+            <div className="grid gap-4 md:grid-cols-2">
+
+              <label className="block text-sm font-medium text-gray-700">
+                Category <span className="text-red-500">*</span>
+                {catLoading ? (
+                  <div className="mt-1 flex items-center gap-2 text-sm text-gray-400">
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-[#ff9900]" />
+                    Loading…
+                  </div>
+                ) : (
+                  <select value={selectedCat} onChange={(e) => handleCatChange(e.target.value)} className={inputCls}>
+                    <option value="">Select category…</option>
+                    {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+                  </select>
+                )}
+              </label>
+
+              <label className="block text-sm font-medium text-gray-700">
+                Sub-category <span className="text-red-500">*</span>
+                {subCatLoading ? (
+                  <div className="mt-1 flex items-center gap-2 text-sm text-gray-400">
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-[#ff9900]" />
+                    Loading sub-categories…
+                  </div>
+                ) : (
+                  <select
+                    value={selectedSub}
+                    onChange={(e) => handleSubChange(e.target.value)}
+                    disabled={!subCategories.length}
+                    className={`${inputCls} disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    <option value="">Select sub-category…</option>
+                    {subCategories.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
+                  </select>
+                )}
+              </label>
+
+            </div>
+
+            {attrLoading && (
+              <div className="flex items-center gap-2 rounded border border-dashed border-[#ff9900]/40 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-amber-300 border-t-amber-600" />
+                Loading product attribute fields…
+              </div>
+            )}
+
+            {!attrLoading && attributes.length > 0 && (
+              <div className="rounded border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                ✓ <strong>{attributes.length} attribute fields</strong> loaded for{" "}
+                <em>{selectedCatName} › {selectedSubName}</em>.
+                <span className="ml-1 text-emerald-600">
+                  ({attributes.filter((a) => a.required).length} required)
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
+            <button
+              onClick={() => navigate("/admin/products")}
+              className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => setStep(2)}
+              disabled={!step1Ready}
+              className="inline-flex items-center gap-2 rounded bg-[#ff9900] px-5 py-2 text-sm font-bold text-[#111827] disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[#f08c00] transition-colors"
+            >
+              Continue <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ══ STEP 2 ══ */}
+      {step === 2 && (
+        <div className="overflow-hidden rounded bg-white shadow-sm ring-1 ring-black/5">
+
+          <div className="border-b border-gray-100 px-6 py-4">
+            <h2 className="font-bold text-gray-900">Step 2 — Product details</h2>
+            <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+              <span className="font-semibold text-gray-700">{selectedCatName}</span>
+              <ChevronRight size={12} />
+              <span className="font-semibold text-gray-700">{selectedSubName}</span>
+              <button onClick={() => setStep(1)} className="ml-2 text-[#c45500] hover:underline font-medium">
+                Change
+              </button>
+            </div>
+          </div>
+
+          <div className="flex border-b border-gray-100 px-6">
+            <button className={tabCls("details")} onClick={() => setActiveTab("details")}>
+              📦 Product Info
+            </button>
+            <button className={tabCls("seo")} onClick={() => setActiveTab("seo")}>
+              🔍 SEO
+              {(seo.metaTitle || seo.metaDesc) && (
+                <span className="ml-1.5 inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              )}
+            </button>
+          </div>
+
+          <div className="p-6">
+
+            {activeTab === "details" && (
+              <div className="space-y-6">
+                <div>
+                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-gray-400">Product info</p>
+                  <div className="grid gap-4 md:grid-cols-2">
+
+                    <label className="block text-sm font-medium text-gray-700 md:col-span-2">
+                      Product name <span className="text-red-500">*</span>
+                      <input
+                        value={form.productName}
+                        onChange={(e) => handleNameChange(e.target.value)}
+                        placeholder="e.g. Cotton Floral Dress"
+                        className={inputCls}
+                      />
+                    </label>
+
+                    <label className="block text-sm font-medium text-gray-700 md:col-span-2">
+                      <div className="flex items-center justify-between">
+                        <span>URL Slug</span>
+                        {slug && (
+                          <span className="text-xs text-gray-400">
+                            /products/<span className="font-mono text-[#c45500]">{slug}</span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex overflow-hidden rounded border border-gray-300 focus-within:border-[#ff9900] focus-within:ring-2 focus-within:ring-[#ff9900]/30">
+                        <span className="flex items-center bg-gray-100 px-3 text-xs text-gray-500 border-r border-gray-300 whitespace-nowrap">
+                          /products/
+                        </span>
+                        <input
+                          value={slug}
+                          onChange={(e) => { setSlug(generateSlug(e.target.value)); setSlugEdited(true); }}
+                          placeholder="auto-generated-from-name"
+                          className="flex-1 bg-white px-3 py-2 text-sm font-mono text-[#c45500] outline-none"
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-gray-400">Auto-generated from product name. You can edit it manually.</p>
+                    </label>
+
+                    <label className="block text-sm font-medium text-gray-700">
+                      SKU <span className="text-red-500">*</span>
+                      <input
+                        value={form.sku}
+                        onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                        placeholder="e.g. SKU-CFD-001"
+                        className={inputCls}
+                      />
+                    </label>
+
+                    <label className="block text-sm font-medium text-gray-700">
+                      Price (₹)
+                      <input
+                        type="number"
+                        value={form.price}
+                        onChange={(e) => setForm({ ...form, price: e.target.value })}
+                        placeholder="0.00"
+                        className={inputCls}
+                      />
+                    </label>
+
+                    <label className="block text-sm font-medium text-gray-700 md:col-span-2">
+                      Opening stock
+                      <input
+                        type="number"
+                        value={form.stock}
+                        onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                        placeholder="0"
+                        className={inputCls}
+                      />
+                    </label>
+
+                  </div>
+                </div>
+
+                {attributes.length > 0 && (
+                  <div className="rounded border border-gray-100 bg-gray-50 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase tracking-wide text-[#c45500]">
+                        Product attributes — {attributes.length} fields
+                      </p>
+                      <span className="text-xs text-gray-400">
+                        {attributes.filter((a) => a.required).length} required
+                      </span>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {attributes.map((attr) => (
+                        <AttrField
+                          key={attr._id}
+                          attr={attr}
+                          value={attrValues[attr._id] ?? ""}
+                          onChange={(id, val) => setAttrValues((prev) => ({ ...prev, [id]: val }))}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!seo.metaTitle && !seo.metaDesc && (
+                  <div
+                    className="flex cursor-pointer items-center gap-3 rounded border border-dashed border-[#ff9900]/40 bg-amber-50 px-4 py-3 text-sm text-amber-700 hover:bg-amber-100 transition-colors"
+                    onClick={() => setActiveTab("seo")}
+                  >
+                    <span className="text-lg">🔍</span>
+                    <div>
+                      <p className="font-semibold">Add SEO details to improve search visibility</p>
+                      <p className="text-xs text-amber-600">Click to fill meta title, description & keywords →</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "seo" && (
+              <SeoTab seo={seo} setSeo={setSeo} slug={slug} productName={form.productName} />
+            )}
+
+          </div>
+
+          {submitError && (
+            <div className="mx-6 mb-4 rounded border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
+              {submitError}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3 border-t border-gray-100 px-6 py-4">
+            <button
+              onClick={() => setStep(1)}
+              className="flex items-center gap-1.5 rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            >
+              <ArrowLeft size={15} /> Back
+            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => navigate("/admin/products")}
+                className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addListing}
+                disabled={!canSubmit}
+                className="inline-flex items-center gap-2 rounded bg-[#ff9900] px-5 py-2 text-sm font-bold text-[#111827] disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[#f08c00] transition-colors"
+              >
+                {submitting && (
+                  <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#111827]/30 border-t-[#111827]" />
+                )}
+                {submitting ? "Saving…" : "Save listing"}
+              </button>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+    </div>
+  );
+}
